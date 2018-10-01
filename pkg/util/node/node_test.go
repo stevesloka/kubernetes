@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"os"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -94,6 +95,7 @@ func TestGetHostname(t *testing.T) {
 	testCases := []struct {
 		hostName         string
 		expectedHostName string
+		hostnameEnv      string
 		expectError      bool
 	}{
 		{
@@ -105,9 +107,18 @@ func TestGetHostname(t *testing.T) {
 			expectedHostName: "abc",
 			expectError:      false,
 		},
+		{
+			expectedHostName: "abc",
+			hostnameEnv:      " abc  ",
+			expectError:      false,
+		},
 	}
 
 	for idx, test := range testCases {
+		if len(test.hostnameEnv) != 0 {
+			os.Setenv("NODE_NAME", test.hostnameEnv)
+		}
+
 		hostName, err := GetHostname(test.hostName)
 		if err != nil && !test.expectError {
 			t.Errorf("[%d]: unexpected error: %s", idx, err)

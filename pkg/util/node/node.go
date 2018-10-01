@@ -42,13 +42,19 @@ const (
 
 // GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'.
 func GetHostname(hostnameOverride string) (string, error) {
-	hostName := hostnameOverride
+	// Check for ENV Var to override config for hostname
+	hostName := os.Getenv("NODE_NAME")
 	if len(hostName) == 0 {
-		nodeName, err := os.Hostname()
-		if err != nil {
-			return "", fmt.Errorf("couldn't determine hostname: %v", err)
+		hostName = hostnameOverride
+		if len(hostName) == 0 {
+
+			nodeName, err := os.Hostname()
+			if err != nil {
+				return "", fmt.Errorf("couldn't determine hostname: %v", err)
+			}
+			hostName = nodeName
+
 		}
-		hostName = nodeName
 	}
 
 	// Trim whitespaces first to avoid getting an empty hostname
