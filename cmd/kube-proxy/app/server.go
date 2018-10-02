@@ -81,6 +81,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
+var (
+	hostNameOverride string
+)
+
 const (
 	proxyModeUserspace   = "userspace"
 	proxyModeIPTables    = "iptables"
@@ -140,7 +144,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
-	fs.StringVar(&o.config.HostnameOverride, "hostname-override", o.config.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+	fs.StringVar(&hostNameOverride, "hostname-override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' (experimental). If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.DurationVar(&o.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
@@ -207,6 +211,21 @@ func (o *Options) Complete() error {
 	err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// ProcessArgs processes args passed that were overridden by config
+func (o *Options) ProcessArgs() error {
+	// Check if hostname-override argument is set and use value since configFile always
+	// overrides any value set for this arg
+	if len(hostNameOverride) > 0 {
+		hostName := strings.TrimSpace(hostNameOverride)
+		if len(hostName) == 0 {
+			return fmt.Errorf("empty hostname-override is invalid")
+		}
+		o.config.HostnameOverride = strings.ToLower(hostName)
 	}
 
 	return nil
@@ -350,9 +369,11 @@ with the apiserver API to configure the proxy.`,
 			if err := initForOS(opts.WindowsService); err != nil {
 				glog.Fatalf("failed OS init: %v", err)
 			}
-
 			if err := opts.Complete(); err != nil {
 				glog.Fatalf("failed complete: %v", err)
+			}
+			if err := opts.ProcessArgs(); err != nil {
+				glog.Fatalf("failed processargs: %v", err)
 			}
 			if err := opts.Validate(args); err != nil {
 				glog.Fatalf("failed validate: %v", err)

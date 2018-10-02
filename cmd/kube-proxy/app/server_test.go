@@ -221,6 +221,7 @@ nodePortAddresses:
 		clusterCIDR        string
 		healthzBindAddress string
 		metricsBindAddress string
+		hostNameOverride   string
 	}{
 		{
 			name:               "iptables mode, IPv4 all-zeros bind address",
@@ -371,6 +372,41 @@ func TestLoadConfigFailures(t *testing.T) {
 		_, err := options.loadConfig([]byte(config))
 		if assert.Error(t, err, tc.name) {
 			assert.Contains(t, err.Error(), tc.expErr, tc.name)
+		}
+	}
+}
+
+// TestProcessArgs tests processing args
+func TestProcessArgs(t *testing.T) {
+
+	testCases := []struct {
+		name        string
+		hostnameArg string
+		expHostname string
+	}{
+		{
+			name:        "Hostname from config file",
+			hostnameArg: "",
+			expHostname: "foo",
+		},
+		{
+			name:        "Hostname from argument",
+			hostnameArg: "  bar ",
+			expHostname: "bar",
+		},
+	}
+	for _, tc := range testCases {
+		options := NewOptions()
+		options.config = &kubeproxyconfig.KubeProxyConfiguration{
+			HostnameOverride: "foo",
+		}
+
+		hostNameOverride = tc.hostnameArg
+
+		err := options.ProcessArgs()
+		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+		if tc.expHostname != options.config.HostnameOverride {
+			t.Fatalf("%s: expected hostname: %s, but got: %s", tc.name, tc.expHostname, options.config.HostnameOverride)
 		}
 	}
 }
